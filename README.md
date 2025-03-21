@@ -1,7 +1,11 @@
 Inspired by the nice work of "https://github.com/ovnrain/javbus-api". Really convenience especially when you are in a limited network environment. 
-##!!! YOU HAVE TO SETUP YOUR OWN API AND ADD IN THE API LINK IN JSON FILE TO FUNCTION NORMALLY!!! Refer to the repo above. Koyeb is also one of the options. 
+
+!!! YOU HAVE TO SETUP YOUR OWN API AND ADD IN THE API LINK IN JSON FILE TO FUNCTION NORMALLY!!! 
+
+Refer to the repo above. Koyeb is also one of the options. 
 
 I take the trouble to spider a little bit more extra movie info from DMM 'cause I always feel like to read them while javbus does not include such info. The original code is from the wonderful work of "https://github.com/metatube-community/jellyfin-plugin-metatube". I have been using this so long and never dreamed of programming with it oneday. 
+
 An extra online player was added in to the request of a net friend. I also tried the great accomplishment of MIYUKI Downloader. (It's gone now and we all know why) 
 Spec file to pack is also included. 
 
@@ -84,8 +88,10 @@ A: Could be network issues or resource access restrictions - check connection or
 **Q: Packaging errors**  
 A: Verify all required Python libraries are installed and follow packaging instructions
 
-灵感来源于"https://github.com/ovnrain/javbus-api"的优秀作品。该方案在网络受限环境下尤其便利。
+灵感来源于 "https://github.com/ovnrain/javbus-api" 的优秀作品。该方案在网络受限环境下尤其便利。
+
 !!! 您必须自行搭建API并将接口链接添加到JSON文件中才能正常使用!!! 
+
 请参考上述仓库，Koyeb也是可选部署方案之一。
 
 我特意从DMM抓取了更多影片元数据——还挺有意思的，而javbus本身并不包含此类内容。原始代码来自 "https://github.com/metatube-community/jellyfin-plugin-metatube" 这一杰出项目。我长期使用该插件，却从未想过有朝一日会基于它进行二次开发。
