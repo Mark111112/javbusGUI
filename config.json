@@ -9,6 +9,7 @@
         "bdd": "1BDD",
         "blk": "BLK00",
         "dandy": "1Dandy",
+        "dphn": "332dphn",
         "dvdes": "DVDES",
         "fcp": "h_001fcp",
         "fsdss": "1fsdss",
@@ -35,6 +36,7 @@
         "kird": "KIRD00",
         "kisd": "KISD00",
         "ksd": "5421ksd",
+        "ktds": "h_094ktds",
         "lol": "12lol",
         "mded": "MDED00",
         "mdyd": "MDYD00",
@@ -66,9 +68,11 @@
         "rbd": "RBD00",
         "rct": "1RCT",
         "sace": "1SACE",
+        "sama": "h_244sama",
         "sdde": "1SDDE",
         "sddm": "1SDDM",
         "sdmt": "1SDMT",
+        "sma": "83sma",
         "soe": "SOE00",
         "sps": "SPS00",
         "star": "1STAR",
@@ -79,6 +83,14 @@
         "tkbn": "h_254tkbn",
         "vspdr": "1VSPDR",
         "vspds": "1VSPDS",
-        "wanz": "WANZ00"
+        "wanz": "WANZ00",
+        "wnz": "3wnz"
+    },
+    "translation": {
+        "api_url": "http://localhost:11434/api/chat",
+        "source_lang": "日语",
+        "target_lang": "中文",
+        "api_token": "",
+        "model": "THUDM/glm-4-9b-chat"
     }
 }

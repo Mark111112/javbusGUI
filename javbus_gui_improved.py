@@ -13,7 +13,8 @@ from PyQt5.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, QH
                             QTableWidget, QTableWidgetItem, QHeaderView, 
                             QMessageBox, QSplitter, QProgressBar, QMenu, QTextBrowser,
                             QDialog, QListView, QStackedWidget, QAction, QMenuBar, QAbstractItemView,
-                            QGroupBox, QFrame)
+                            QGroupBox, QFrame, QSizePolicy, QComboBox, QFileDialog, QTabWidget, 
+                            QCheckBox, QInputDialog, QStatusBar, QScrollArea, QSpinBox)
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, QPoint, QEvent, QTimer, QObject
 from PyQt5.QtGui import QPixmap, QImage, QCursor, QTextCursor, QIcon, QColor
 import pyperclip  # 用于复制文本到剪贴板
@@ -99,6 +100,9 @@ def import_video_player():
         QMessageBox.critical(None, "错误", f"无法导入video_player2模块: {str(e)}")
         return None
 
+# 导入翻译模块
+from translator import get_translator
+
 class OptionsDialog(QDialog):
     """选项设置对话框"""
     
@@ -107,6 +111,10 @@ class OptionsDialog(QDialog):
         self.parent = parent
         self.current_api_url = current_api_url
         self.current_watch_url_prefix = current_watch_url_prefix
+        
+        # 获取翻译器实例
+        self.translator = get_translator()
+        
         self.init_ui()
         
     def init_ui(self):
@@ -138,6 +146,7 @@ class OptionsDialog(QDialog):
         # 添加选项到列表
         self.option_list.addItem("一般选项")
         self.option_list.addItem("Fanza对应")  # 新增Fanza对应选项
+        self.option_list.addItem("翻译设置")  # 新增翻译设置选项
         self.option_list.setCurrentRow(0)  # 选中第一项
         
         # 右侧堆叠窗口
@@ -149,6 +158,9 @@ class OptionsDialog(QDialog):
         
         # 创建Fanza对应页面
         self.create_fanza_mapping_page()
+        
+        # 创建翻译设置页面
+        self.create_translation_settings_page()
         
         # 底部按钮
         button_layout = QHBoxLayout()
@@ -470,6 +482,404 @@ class OptionsDialog(QDialog):
             return dialog.current_api_url, dialog.current_watch_url_prefix
         return current_api_url, current_watch_url_prefix
 
+    def create_translation_settings_page(self):
+        """创建翻译设置页面"""
+        translation_page = QWidget()
+        layout = QVBoxLayout(translation_page)
+        layout.setSpacing(15)  # 增加间距
+        
+        # API类型选择
+        api_type_section = QGroupBox("API类型")
+        api_type_layout = QVBoxLayout(api_type_section)
+        
+        self.api_type_combo = QComboBox()
+        self.api_type_combo.addItem("OpenAI兼容API", "openai")
+        self.api_type_combo.addItem("Ollama本地API", "ollama")
+        self.api_type_combo.addItem("SiliconFlow API", "siliconflow")
+        
+        # 根据当前API URL自动选择API类型
+        current_api_url = self.translator.api_url.lower()
+        if "localhost:11434" in current_api_url or "127.0.0.1:11434" in current_api_url:
+            self.api_type_combo.setCurrentIndex(1)  # Ollama
+        elif "siliconflow.cn" in current_api_url:
+            self.api_type_combo.setCurrentIndex(2)  # SiliconFlow
+        else:
+            self.api_type_combo.setCurrentIndex(0)  # OpenAI兼容
+            
+        # 连接信号
+        self.api_type_combo.currentIndexChanged.connect(self.on_api_type_changed)
+        
+        api_type_layout.addWidget(self.api_type_combo)
+        layout.addWidget(api_type_section)
+        
+        # 翻译API设置
+        api_section = QGroupBox("翻译API设置")
+        api_layout = QGridLayout(api_section)
+        
+        # API URL
+        api_url_label = QLabel("API URL:")
+        self.api_url_input = QLineEdit(self.translator.api_url)
+        self.api_url_input.setPlaceholderText("输入API地址，如https://api.openai.com/v1/chat/completions")
+        api_layout.addWidget(api_url_label, 0, 0)
+        api_layout.addWidget(self.api_url_input, 0, 1)
+        
+        # 源语言
+        source_lang_label = QLabel("源语言:")
+        self.source_lang_input = QLineEdit(self.translator.source_lang)
+        self.source_lang_input.setPlaceholderText("输入源语言，如日语")
+        api_layout.addWidget(source_lang_label, 1, 0)
+        api_layout.addWidget(self.source_lang_input, 1, 1)
+        
+        # 目标语言
+        target_lang_label = QLabel("目标语言:")
+        self.target_lang_input = QLineEdit(self.translator.target_lang)
+        self.target_lang_input.setPlaceholderText("输入目标语言，如中文")
+        api_layout.addWidget(target_lang_label, 2, 0)
+        api_layout.addWidget(self.target_lang_input, 2, 1)
+        
+        # API Token
+        api_token_label = QLabel("API Token:")
+        self.api_token_input = QLineEdit(self.translator.api_token)
+        self.api_token_input.setPlaceholderText("输入API密钥")
+        self.api_token_input.setEchoMode(QLineEdit.Password)
+        api_layout.addWidget(api_token_label, 3, 0)
+        api_layout.addWidget(self.api_token_input, 3, 1)
+        
+        # 模型
+        model_label = QLabel("模型:")
+        self.model_input = QComboBox()
+        api_layout.addWidget(model_label, 4, 0)
+        api_layout.addWidget(self.model_input, 4, 1)
+        
+        # 获取模型列表按钮
+        self.get_models_button = QPushButton("获取可用模型")
+        self.get_models_button.clicked.connect(self.get_available_models)
+        api_layout.addWidget(self.get_models_button, 5, 1)
+        
+        # 初始化模型列表
+        self.init_model_list()
+        
+        layout.addWidget(api_section)
+        
+        # 说明
+        desc_label = QLabel("翻译设置用于将影片简介翻译成目标语言。设置支持OpenAI兼容API、SiliconFlow API和本地Ollama API。")
+        desc_label.setWordWrap(True)
+        desc_label.setStyleSheet("color: #666;")
+        layout.addWidget(desc_label)
+        
+        # 按钮布局
+        button_layout = QHBoxLayout()
+        
+        apply_button = QPushButton("应用设置")
+        apply_button.setMinimumWidth(100)
+        apply_button.clicked.connect(self.apply_translation_settings)
+        
+        test_button = QPushButton("测试连接")
+        test_button.setMinimumWidth(100)
+        test_button.clicked.connect(self.test_translation_api)
+        
+        button_layout.addWidget(test_button)
+        button_layout.addWidget(apply_button)
+        button_layout.addStretch()
+        
+        layout.addLayout(button_layout)
+        layout.addStretch()
+        
+        # 添加到堆叠窗口
+        self.option_stack.addWidget(translation_page)
+    
+    def init_model_list(self):
+        """初始化模型列表"""
+        self.model_input.clear()
+        
+        # 根据当前选中的API类型设置模型列表
+        api_type = self.api_type_combo.currentData()
+        
+        if api_type == "ollama":
+            # Ollama默认模型
+            default_models = ["llama3", "mistral", "gemma", "qwen", "codellama", "phi", "llama2", "llama2-uncensored"]
+        elif api_type == "siliconflow":
+            # SiliconFlow 模型
+            default_models = [
+                "THUDM/glm-4-9b-chat", 
+                "Qwen/QwQ-32B", 
+                "Qwen/Qwen2-72B-Instruct",
+                "Meta-Llama-3-8B-Instruct",
+                "Meta-Llama-3-70B-Instruct"
+            ]
+        else:
+            # OpenAI兼容模型
+            default_models = ["gpt-3.5-turbo", "gpt-4", "gpt-4-turbo", "gpt-4o", "gpt-3.5-turbo-16k"]
+        
+        # 添加默认模型
+        for model in default_models:
+            self.model_input.addItem(model)
+        
+        # 设置当前选中的模型
+        current_index = self.model_input.findText(self.translator.model)
+        if current_index >= 0:
+            self.model_input.setCurrentIndex(current_index)
+        else:
+            # 如果当前模型不在预设列表中，添加它
+            self.model_input.addItem(self.translator.model)
+            self.model_input.setCurrentText(self.translator.model)
+            
+        # 设置为可编辑，允许用户输入自定义模型名称
+        self.model_input.setEditable(True)
+    
+    def on_api_type_changed(self, index):
+        """当API类型改变时更新UI"""
+        api_type = self.api_type_combo.currentData()
+        
+        if api_type == "ollama":
+            # 设置Ollama默认URL
+            self.api_url_input.setText("http://localhost:11434/api/generate")
+            # Ollama通常不需要token
+            self.api_token_input.setEnabled(False)
+            self.api_token_input.setPlaceholderText("Ollama通常不需要API Token")
+        elif api_type == "siliconflow":
+            # 设置SiliconFlow默认URL
+            self.api_url_input.setText("https://api.siliconflow.cn/v1/chat/completions")
+            # SiliconFlow需要token
+            self.api_token_input.setEnabled(True)
+            self.api_token_input.setPlaceholderText("输入SiliconFlow API密钥")
+        else:
+            # OpenAI兼容API
+            self.api_url_input.setText("https://api.openai.com/v1/chat/completions")
+            self.api_token_input.setEnabled(True)
+            self.api_token_input.setPlaceholderText("输入API密钥")
+        
+        # 更新模型列表
+        self.init_model_list()
+    
+    def get_available_models(self):
+        """获取可用模型列表"""
+        api_type = self.api_type_combo.currentData()
+        api_url = self.api_url_input.text().strip()
+        api_token = self.api_token_input.text().strip()
+        
+        if not api_url:
+            QMessageBox.warning(self, "警告", "请先输入API URL")
+            return
+        
+        # 对于非Ollama API，需要验证token
+        if api_type != "ollama" and not api_token:
+            QMessageBox.warning(self, "警告", "请先输入API Token")
+            return
+        
+        # 设置等待光标
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        
+        try:
+            if api_type == "ollama":
+                # 获取Ollama模型列表
+                models = self.translator.get_ollama_models(api_url, api_token)
+                
+                if models:
+                    # 清空并更新模型下拉列表
+                    self.model_input.clear()
+                    for model in models:
+                        self.model_input.addItem(model)
+                    QMessageBox.information(self, "成功", f"成功获取到{len(models)}个Ollama模型")
+                else:
+                    QMessageBox.warning(self, "警告", "未能获取到Ollama模型，请确认Ollama服务已启动")
+            else:
+                QMessageBox.information(self, "提示", "当前API类型不支持获取模型列表，请手动输入模型名称")
+        except Exception as e:
+            QMessageBox.warning(self, "错误", f"获取模型列表失败: {str(e)}")
+        finally:
+            # 恢复正常光标
+            QApplication.restoreOverrideCursor()
+            
+    def apply_translation_settings(self):
+        """应用翻译设置"""
+        api_url = self.api_url_input.text().strip()
+        source_lang = self.source_lang_input.text().strip()
+        target_lang = self.target_lang_input.text().strip()
+        api_token = self.api_token_input.text().strip()
+        model = self.model_input.currentText()
+        
+        # 验证输入
+        if not api_url:
+            QMessageBox.warning(self, "警告", "API URL不能为空")
+            return
+            
+        if not source_lang:
+            QMessageBox.warning(self, "警告", "源语言不能为空")
+            return
+            
+        if not target_lang:
+            QMessageBox.warning(self, "警告", "目标语言不能为空")
+            return
+            
+        # 对于非Ollama API，需要验证token
+        api_type = self.api_type_combo.currentData()
+        if api_type != "ollama" and not api_token:
+            QMessageBox.warning(self, "警告", "API Token不能为空")
+            return
+            
+        # 保存设置
+        if self.translator.save_config(api_url, source_lang, target_lang, api_token, model):
+            QMessageBox.information(self, "成功", "翻译设置已保存")
+        else:
+            QMessageBox.warning(self, "错误", "保存翻译设置失败")
+    
+    def test_translation_api(self):
+        """测试翻译API连接"""
+        # 获取当前输入的设置
+        api_url = self.api_url_input.text().strip()
+        api_token = self.api_token_input.text().strip()
+        model = self.model_input.currentText()
+        api_type = self.api_type_combo.currentData()
+        
+        # 验证输入
+        if not api_url:
+            QMessageBox.warning(self, "警告", "API URL不能为空")
+            return
+            
+        # 对于非Ollama API，需要验证token
+        if api_type != "ollama" and not api_token:
+            QMessageBox.warning(self, "警告", "API Token不能为空")
+            return
+            
+        # 设置等待光标
+        QApplication.setOverrideCursor(Qt.WaitCursor)
+        
+        try:
+            # 准备请求头
+            headers = {
+                "Content-Type": "application/json"
+            }
+            
+            if api_token:
+                headers["Authorization"] = f"Bearer {api_token}"
+            
+            # 根据API类型构建不同的请求负载和URL
+            test_api_url = api_url
+            
+            if api_type == "ollama":
+                # Ollama API - 修改URL使用generate接口
+                ollama_url = api_url
+                if "/api/chat" in ollama_url:
+                    # 将chat改为generate
+                    ollama_url = ollama_url.replace("/api/chat", "/api/generate")
+                elif not "/api/generate" in ollama_url:
+                    # 确保URL指向generate接口
+                    base_url = ollama_url
+                    if base_url.endswith("/"):
+                        base_url = base_url[:-1]
+                    if not "/api" in base_url:
+                        ollama_url = f"{base_url}/api/generate"
+                    else:
+                        ollama_url = f"{base_url}/generate"
+                        
+                test_api_url = ollama_url
+                print(f"使用Ollama生成API: {ollama_url}")
+                
+                # Ollama API格式
+                payload = {
+                    "model": model,
+                    "prompt": "Say 'Translation API works!' in Chinese.",
+                    "stream": False,
+                    "options": {
+                        "temperature": 0.3,
+                        "top_p": 0.9
+                    }
+                }
+            elif api_type == "siliconflow":
+                # SiliconFlow API格式
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "Say 'Translation API works!' in Chinese."}
+                    ],
+                    "temperature": 0.3,
+                    "stream": False,
+                    "max_tokens": 512,
+                    "top_p": 0.7,
+                    "top_k": 50,
+                    "response_format": {"type": "text"}
+                }
+            else:
+                # OpenAI兼容API
+                payload = {
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "You are a helpful assistant."},
+                        {"role": "user", "content": "Say 'Translation API works!' in Chinese."}
+                    ],
+                    "temperature": 0.3
+                }
+            
+            print(f"测试API: {test_api_url}, 模型: {model}")
+            print(f"请求头: {headers}")
+            print(f"请求数据: {payload}")
+            
+            # 发送请求
+            response = requests.post(
+                test_api_url,
+                headers=headers,
+                json=payload,
+                timeout=60  # 增加超时时间到60秒
+            )
+            
+            # 恢复正常光标
+            QApplication.restoreOverrideCursor()
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"API响应: {result}")
+                
+                # 尝试从不同格式的响应中提取内容
+                message = ""
+                
+                # Ollama API格式 - 处理generate接口的响应
+                if api_type == "ollama":
+                    if "response" in result:
+                        message = result["response"]
+                    elif "message" in result and isinstance(result["message"], dict):
+                        if "content" in result["message"] and result["message"]["content"]:
+                            message = result["message"]["content"]
+                    
+                    # 如果响应为空但done_reason为load，表示模型正在加载
+                    if not message and "done_reason" in result and result["done_reason"] == "load":
+                        QMessageBox.warning(self, "模型加载中", "模型正在加载中，请稍后重试")
+                        return
+                # 标准OpenAI格式
+                elif "choices" in result and len(result["choices"]) > 0:
+                    choice = result["choices"][0]
+                    if "message" in choice and "content" in choice["message"]:
+                        message = choice["message"]["content"]
+                    elif "text" in choice:
+                        message = choice["text"]
+                
+                if message:
+                    QMessageBox.information(self, "测试成功", f"API响应成功: {message}")
+                else:
+                    QMessageBox.warning(self, "警告", "API响应成功，但无法提取内容，请检查响应格式")
+            else:
+                error_detail = ""
+                try:
+                    error_data = response.json()
+                    if "error" in error_data:
+                        if isinstance(error_data["error"], dict):
+                            error_detail = error_data["error"].get("message", "")
+                        else:
+                            error_detail = str(error_data["error"])
+                except:
+                    error_detail = response.text[:200]
+                
+                error_message = f"API连接失败: HTTP {response.status_code}"
+                if error_detail:
+                    error_message += f"\n{error_detail}"
+                
+                QMessageBox.critical(self, "错误", error_message)
+        except Exception as e:
+            # 恢复正常光标
+            QApplication.restoreOverrideCursor()
+            QMessageBox.critical(self, "错误", f"连接测试失败: {str(e)}")
+
 class StarSearchThread(QThread):
     """用于在后台搜索演员的线程"""
     search_complete = pyqtSignal(list)
@@ -746,6 +1156,9 @@ class SummaryWorker(QObject):
     """用于在后台获取影片简介的工作类"""
     summary_ready = pyqtSignal(str, str)  # 参数：(movie_id, summary)
     summary_error = pyqtSignal(str, str)  # 参数：(movie_id, error_message)
+    translation_ready = pyqtSignal(str, str, str)  # 参数：(movie_id, original_summary, translated_summary)
+    translation_error = pyqtSignal(str, str)  # 参数：(movie_id, error_message)
+    title_translation_ready = pyqtSignal(str, str)  # 参数：(movie_id, translated_title)
     
     def __init__(self, movie_id, movie_data, db=None):
         super().__init__()
@@ -753,9 +1166,18 @@ class SummaryWorker(QObject):
         self.movie_data = movie_data
         self.db = db
         
+        # 获取翻译器实例
+        self.translator = get_translator()
+        
     def get_summary(self):
         """获取影片简介"""
         try:
+            # 首先启动标题翻译，不需要等待简介结果
+            title = self.movie_data.get("title", "")
+            if title:
+                # 立即开始标题翻译，不等待简介结果
+                QTimer.singleShot(100, lambda: self.translate_title(title))
+            
             # 检查movie_data是否已有摘要信息
             summary = self.movie_data.get("summary", "")
             
@@ -775,14 +1197,102 @@ class SummaryWorker(QObject):
                 else:
                     error = summary_result.get("error", "未知错误")
                     self.summary_error.emit(self.movie_id, error)
-                    return
+                    # 即使获取简介失败，也不影响后续逻辑
             
             # 发射信号通知获取到的摘要
             self.summary_ready.emit(self.movie_id, summary)
             
+            # 如果有摘要，尝试翻译
+            if summary:
+                # 连接翻译器的信号
+                self.translator.translation_ready.connect(self.on_translation_ready)
+                self.translator.translation_error.connect(self.on_translation_error)
+                
+                # 发送翻译请求
+                QTimer.singleShot(1000, lambda: self.translator.translate(self.movie_id, summary))
+                
         except Exception as e:
             print(f"获取影片摘要失败: {str(e)}")
             self.summary_error.emit(self.movie_id, str(e))
+            
+            # 即使获取简介出错，仍然尝试翻译标题
+            title = self.movie_data.get("title", "")
+            if title:
+                try:
+                    QTimer.singleShot(100, lambda: self.translate_title(title))
+                except Exception as title_error:
+                    print(f"安排标题翻译时出错: {str(title_error)}")
+    
+    def translate_title(self, title):
+        """翻译影片标题"""
+        try:
+            print(f"开始翻译标题: {title}")
+            # 使用translator发送翻译请求
+            # 创建一个临时ID用于标题翻译，避免与摘要翻译混淆
+            temp_id = f"{self.movie_id}_title"
+            
+            # 使用自定义连接器
+            try:
+                self.translator.translation_ready.connect(self.on_title_translation_ready)
+                self.translator.translation_error.connect(self.on_title_translation_error)
+            except Exception as e:
+                print(f"连接标题翻译信号时出错: {str(e)}")
+            
+            # 发送翻译请求
+            self.translator.translate(temp_id, title)
+        except Exception as e:
+            print(f"翻译标题失败: {str(e)}")
+            # 即使出错也不中断其他处理
+    
+    def on_title_translation_ready(self, temp_id, original_text, translated_text):
+        """处理标题翻译完成的回调"""
+        # 检查是否是标题翻译的临时ID
+        if temp_id.endswith("_title") and temp_id.split("_title")[0] == self.movie_id:
+            # 断开连接，避免重复接收信号
+            self.translator.translation_ready.disconnect(self.on_title_translation_ready)
+            self.translator.translation_error.disconnect(self.on_title_translation_error)
+            
+            # 发射标题翻译完成信号
+            self.title_translation_ready.emit(self.movie_id, translated_text)
+    
+    def on_title_translation_error(self, temp_id, error_message):
+        """处理标题翻译错误的回调"""
+        # 检查是否是标题翻译的临时ID
+        if temp_id.endswith("_title") and temp_id.split("_title")[0] == self.movie_id:
+            # 断开连接，避免重复接收信号
+            self.translator.translation_ready.disconnect(self.on_title_translation_ready)
+            self.translator.translation_error.disconnect(self.on_title_translation_error)
+            
+            print(f"标题翻译错误: {error_message}")
+    
+    def on_translation_ready(self, movie_id, original_summary, translated_summary):
+        """处理翻译完成的回调"""
+        if movie_id == self.movie_id:
+            # 发射翻译完成信号
+            print(f"SummaryWorker: 收到翻译结果，长度 {len(translated_summary)}")
+            self.translation_ready.emit(movie_id, original_summary, translated_summary)
+            
+            # 断开信号连接，避免重复接收
+            try:
+                self.translator.translation_ready.disconnect(self.on_translation_ready)
+                self.translator.translation_error.disconnect(self.on_translation_error)
+                print("已断开翻译信号连接")
+            except Exception as e:
+                print(f"断开翻译信号连接时出错: {str(e)}")
+    
+    def on_translation_error(self, movie_id, error_message):
+        """处理翻译错误的回调"""
+        if movie_id == self.movie_id:
+            # 发射翻译错误信号
+            print(f"SummaryWorker: 翻译出错: {error_message}")
+            self.translation_error.emit(movie_id, error_message)
+            
+            # 断开信号连接，避免重复接收
+            try:
+                self.translator.translation_ready.disconnect(self.on_translation_ready)
+                self.translator.translation_error.disconnect(self.on_translation_error)
+            except Exception as e:
+                print(f"断开翻译信号连接时出错: {str(e)}")
 
 class JavbusGUI(QMainWindow):
     def __init__(self):
@@ -1200,6 +1710,14 @@ class JavbusGUI(QMainWindow):
         self.stars_text.setStyleSheet("background-color: transparent; border: none;")
         self.stars_text.mousePressEvent = lambda e: self.handle_text_click(e, self.stars_text)
         
+        # 添加title_text控件来显示影片标题
+        self.title_text = QTextBrowser()
+        self.title_text.setMaximumHeight(30)  # 限制高度
+        self.title_text.setOpenLinks(False)   # 不自动打开链接
+        self.title_text.setText("片名: ")
+        self.title_text.setStyleSheet("background-color: transparent; border: none;")
+        
+        movie_info_layout.addWidget(self.title_text)
         movie_info_layout.addWidget(self.producer_text)
         movie_info_layout.addWidget(self.genres_text)
         movie_info_layout.addWidget(self.summary_text)  # 添加简介组件到布局中
@@ -1359,6 +1877,7 @@ class JavbusGUI(QMainWindow):
         self.magnet_list.clear()
         
         # 重置视图组件
+        self.title_text.setText("片名: 加载中...")
         self.producer_text.setText("厂牌: 加载中...")
         self.genres_text.setText("类别: 加载中...")
         self.summary_text.setText("简介: 加载中...")
@@ -1416,7 +1935,13 @@ class JavbusGUI(QMainWindow):
             
             self.progress_bar.setValue(40)
             
-            # 立即显示基础信息：厂牌、类别、演员信息
+            # 立即显示基础信息：片名、厂牌、类别、演员信息
+            # 设置片名信息
+            title = movie_data.get("title", "未知标题")
+            
+            # 更新片名显示
+            self.title_text.setText(f'片名: {title}')
+            
             # 设置厂牌信息
             producer = movie_data.get("producer", {})
             producer_name = producer.get("name", "未知厂牌")
@@ -1467,6 +1992,12 @@ class JavbusGUI(QMainWindow):
             self.summary_thread.started.connect(self.scraper_worker.get_summary)
             self.scraper_worker.summary_ready.connect(self.on_summary_loaded)
             self.scraper_worker.summary_error.connect(self.on_summary_error)
+            
+            # 连接翻译信号
+            self.scraper_worker.translation_ready.connect(self.on_translation_ready)
+            self.scraper_worker.translation_error.connect(self.on_translation_error)
+            self.scraper_worker.title_translation_ready.connect(self.on_title_translation_ready)
+            
             self.summary_thread.start()
             
             # 图片下载（异步，如果没有本地图片）
@@ -1774,6 +2305,9 @@ class JavbusGUI(QMainWindow):
             self.summary_text.setText(f"简介: {summary if summary else '无简介信息'}")
             self.progress_bar.setValue(80)
             
+            # 保存原始简介，以便在翻译后使用
+            self.original_summary = summary
+            
             # 检查是否所有异步任务都完成了
             if not hasattr(self, 'image_download_thread') or not self.image_download_thread.isRunning():
                 self.progress_bar.setValue(100)
@@ -1790,6 +2324,33 @@ class JavbusGUI(QMainWindow):
             if not hasattr(self, 'image_download_thread') or not self.image_download_thread.isRunning():
                 self.progress_bar.setValue(100)
                 self.progress_bar.setVisible(False)
+    
+    def on_translation_ready(self, movie_id, original_summary, translated_summary):
+        """处理翻译完成的回调"""
+        if movie_id == self.current_movie_id:  # 确保仍然是当前选中的影片
+            # 显示原文和翻译
+            print(f"GUI: 收到翻译结果，movie_id={movie_id}, 原文长度={len(original_summary)}, 翻译长度={len(translated_summary)}")
+            combined_text = f"简介:\n\n【原文】\n{original_summary}\n\n【翻译】\n{translated_summary}"
+            print(f"GUI: 设置文本区域，总长度={len(combined_text)}")
+            
+            # 确保QTextBrowser能够显示换行符
+            self.summary_text.setPlainText(combined_text)
+            
+            # 自动调整高度以显示完整内容
+            document_size = self.summary_text.document().size().toSize()
+            # 最小100，最大300像素高度
+            new_height = max(100, min(300, document_size.height() + 20))
+            self.summary_text.setMaximumHeight(new_height)
+            
+            print(f"GUI: 显示翻译结果完成")
+    
+    def on_translation_error(self, movie_id, error_message):
+        """处理翻译错误的回调"""
+        if movie_id == self.current_movie_id:  # 确保仍然是当前选中的影片
+            # 如果有原始简介，仍然显示，并附上翻译错误信息
+            if hasattr(self, 'original_summary') and self.original_summary:
+                self.summary_text.setText(f"简介: {self.original_summary}\n\n【翻译失败: {error_message}】")
+            print(f"翻译错误: {error_message}")
                 
     def on_images_download_complete(self):
         """处理图片下载完成的信号"""
@@ -2543,6 +3104,16 @@ class JavbusGUI(QMainWindow):
             self.image_download_thread.quit()
             self.image_download_thread.wait(1000)  # 最多等待1秒
             
+    def on_title_translation_ready(self, movie_id, translated_title):
+        """处理标题翻译完成的回调"""
+        if movie_id == self.current_movie_id:  # 确保仍然是当前选中的影片
+            # 获取当前标题
+            current_title_text = self.title_text.toPlainText()
+            # 添加翻译标题
+            if "片名:" in current_title_text:
+                updated_title = f"片名: {current_title_text.replace('片名: ', '')}（{translated_title}）"
+                self.title_text.setText(updated_title)
+
 def main():
     app = QApplication(sys.argv)
     
