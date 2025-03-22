@@ -1,3 +1,8 @@
+UPDATE: 
+Translation for titles and movie introduction, using OpenAI compatible API & Ollama models. 
+
+____________________________________________________________________________________________
+
 Inspired by the nice work of "https://github.com/ovnrain/javbus-api". Really convenient especially when you are in a limited network environment. 
 
 !!! YOU HAVE TO SETUP YOUR OWN API AND ADD IN THE API LINK IN JSON FILE TO FUNCTION NORMALLY!!! 
