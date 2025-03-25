@@ -51,11 +51,14 @@ a = Analysis(
     binaries=vlc_binaries,  # 添加VLC二进制文件
     datas=[
         ('fb.ico', '.'),  # 图标文件
-        ('fanza_mappings.json', '.'),  # Fanza映射配置文件
         ('movieinfo.py', '.'),  # 电影信息处理模块
         ('javbus_db.py', '.'),  # 数据库操作模块
-        ('video_player2.py', '.'),  # 影片搜索播放模块
+        ('video_player2.py', '.'),  # 影片搜索播放模块（必需，程序会动态加载此模块）
         ('video_player2_stub.py', '.'),  # VideoPlayer2的存根文件
+        ('translator.py', '.'),  # 翻译模块
+        ('vlc_config.py', '.'),  # VLC配置模块
+        ('config.json', '.'),  # 配置文件（已合并所有配置）
+        ('create_directories.py', '.'),  # 目录创建脚本
     ] + vlc_datas + curl_cffi_datas,  # 合并VLC数据文件和curl_cffi数据文件
     hiddenimports=[
         'sqlite3',
@@ -88,6 +91,11 @@ a = Analysis(
         'shutil',
         'time',
         'datetime',
+        'googletrans',  # 添加翻译相关依赖
+        'googletrans.constants',
+        'googletrans.gtoken',
+        'googletrans.translators',
+        'video_player2',  # 确保视频播放模块被包含
     ],
     hookspath=[],
     hooksconfig={},
