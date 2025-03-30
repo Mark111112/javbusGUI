@@ -1,3 +1,78 @@
+# JavBus Web - Docker Edition
+This is the Docker version of the JavBus application, enabling access to JavBus features via web browsers. The original application is no longer updated.  
+**You still need a https://github.com/ovnrain/javbus-api to obtain the API URL.** Credits to the original author.
+
+## Features
+1. Search movies by video code or actor name
+2. Display latest movie list when no input is provided
+3. View movie details including cover/preview images, studio, categories, actors, and perform nested searches
+4. Display and copy magnet links
+5. Show movie descriptions (some entries require custom FANZA mapping)
+6. Translate titles and descriptions using online APIs (requires API token)
+7. Jump to missav for online viewing
+
+## Quick Start
+### Prerequisites
+- Install [Docker](https://docs.docker.com/get-docker/)
+- Install [Docker Compose](https://docs.docker.com/compose/install/)
+- Obtain a working javbus-api URL
+
+### Docker Compose Deployment
+1. Clone/download this repository
+2. Navigate to project directory
+3. Create `.env` file and set API_URL (optional)
+4. Start application with Docker Compose
+```bash
+# Clone repository
+git clone <repo-url>
+cd dock-2_javbus
+# Build and start
+docker-compose up -d
+
+### For manual deployment:
+```bash
+# Build image
+docker build -t dock-2_javbus .
+
+# Run container
+docker run -d -p 9080:8080 -v /docker/dock-2_javbus/buspic /app/buspic -v /docker/dock-2_javbus/config /app/config -v /docker/dock-2_javbus/data /app/data --name dock-2_javbus furey79:dock-2_javbus
+```
+
+## Access the Application
+
+Visit http://localhost:9080 after startup.
+First-time setup:
+Configure API URL in the header and click "Check API" for validation.
+
+## Data Persistence
+
+Default SQLite storage is preserved through volume mounts:
+
+```bash
+docker run -d -p 9080:8080 \
+  -v ./data:/app/data \
+  -v ./buspic:/app/buspic \
+  -v ./config:/app/config \
+  --name dock-2_javbus furey79:dock-2_javbus
+```
+
+## Custom Configuration
+Modify config.json via web interface or directly:
+```json
+{
+  "api_url": "your_api_url",
+  "watch_url_prefix": "https://missav.ai"
+}
+```
+
+### Notes
+ - Requires valid JavBus API URL to function
+
+ - All images/data are cached locally for performance
+
+ - Contains adult content - strictly for legal adult use. Please comply with your local laws and regulations.
+
+
 # JavBus Web - Docker版
 
 这是JavBus应用程序的Docker版本，允许通过Web浏览器访问JavBus的功能。原应用程序不再更新。
@@ -64,7 +139,6 @@ docker run -d -p 9080:8080 \
   -v ./data:/app/data \
   -v ./buspic:/app/buspic \
   -v ./config:/app/config \
-  -e API_URL="你的API地址" \
   --name dock-2_javbus furey79:dock-2_javbus
 ```
 
