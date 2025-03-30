@@ -28,6 +28,46 @@ import urllib.parse
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
+# 配置较少日志输出的模块
+for module in ['urllib3', 'requests', 'werkzeug', 'chardet.charsetprober']:
+    logging.getLogger(module).setLevel(logging.WARNING)
+
+# 创建视频相关日志过滤器
+class VideoRequestFilter(logging.Filter):
+    """过滤掉视频播放相关的详细日志"""
+    def filter(self, record):
+        # 过滤掉proxy_stream函数中的详细日志
+        if hasattr(record, 'funcName') and record.funcName == 'proxy_stream':
+            # 只在错误时显示日志
+            return record.levelno >= logging.WARNING
+        
+        # 对视频播放相关的日志进行过滤
+        message = record.getMessage()
+        if any(x in message for x in ['视频流代理请求', '代理解码后的URL', '代理流成功', 'HLS URL', '请求:']):
+            return record.levelno >= logging.WARNING
+        
+        return True
+
+# 应用过滤器
+logger = logging.getLogger()
+logger.addFilter(VideoRequestFilter())
+
+# 设置文件日志处理器的最大大小和文件数
+if not os.path.exists('logs'):
+    os.makedirs('logs')
+
+# 添加按日期滚动的文件处理器
+from logging.handlers import TimedRotatingFileHandler
+file_handler = TimedRotatingFileHandler(
+    'logs/webserver.log', 
+    when='midnight',
+    interval=1,
+    backupCount=3  # 保留3天日志
+)
+file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+file_handler.setLevel(logging.INFO)
+logger.addHandler(file_handler)
+
 # Initialize Flask application
 app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)  # Enable CORS

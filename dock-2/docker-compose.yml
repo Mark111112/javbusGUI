@@ -11,6 +11,12 @@ services:
       - ./data:/app/data
       - ./buspic:/app/buspic
       - ./config:/app/config
+      - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
-    tty: true 
+    tty: true
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3" 

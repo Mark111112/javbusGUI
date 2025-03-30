@@ -7,6 +7,9 @@ import time
 import re
 from typing import Optional, Dict, Any
 
+# 设置日志级别为WARNING，减少详细日志
+logging.getLogger(__name__).setLevel(logging.WARNING)
+
 # 尝试导入curl_cffi
 try:
     from curl_cffi import requests
