@@ -6,7 +6,7 @@ import sys
 import json
 import time
 import requests
-from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory
+from flask import Flask, request, jsonify, render_template, redirect, url_for, send_from_directory, Response, stream_with_context
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from javbus_db import JavbusDatabase
@@ -14,6 +14,16 @@ from translator import get_translator
 import logging
 import traceback
 import movieinfo  # Import the movieinfo module
+# 导入视频播放器适配器
+try:
+    import video_player_adapter
+    logging.info("成功导入视频播放器适配器")
+except ImportError as e:
+    logging.error(f"导入视频播放器适配器失败: {str(e)}")
+    video_player_adapter = None
+
+# 添加URL解析库
+import urllib.parse
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -46,66 +56,8 @@ def load_config():
     config = {
         "api_url": "http://192.168.1.246:8922/api",
         "watch_url_prefix": "https://missav.ai",
-        "fanza_mappings": {
-            "abf": "118abf",
-            "abp": "118abp",
-            "atom": "1atom",
-            "bazx": "7bazx",
-            "bdd": "1BDD",
-            "dandy": "1Dandy",
-            "dph": "33dph",
-            "dphn": "33dphn",
-            "fcp": "h_001fcp",
-            "fsdss": "1fsdss",
-            "fset": "1FSET",
-            "gar": "1GAR",
-            "gesu": "49gesu",
-            "glod": "196glod",
-            "gvg": "13gvg",
-            "gvh": "13gvh",
-            "hbad": "1HBAD",
-            "hunt": "1HUNT",
-            "hvad": "1HVAD",
-            "ibw": "504ibw",
-            "idol": "1IDOL",
-            "iene": "1IENE",
-            "iesp": "1IESP",
-            "ksd": "5421ksd",
-            "ktds": "h_094ktds",
-            "lol": "12lol",
-            "midv": "48midv",
-            "mjad": "h_402mjad",
-            "mxgs": "h_068mxgs",
-            "natr": "h_067natr",
-            "need": "h_198need",
-            "nhdt": "1NHDT",
-            "nhdta": "1NHDTA",
-            "nxg": "h_254nxg",
-            "okad": "84okad",
-            "open": "1open",
-            "ped": "24ped",
-            "r": "h_093r",
-            "rct": "1rct",
-            "rctd": "1rctd",
-            "sace": "1SACE",
-            "sama": "h_244sama",
-            "sdde": "1SDDE",
-            "sddm": "1SDDM",
-            "sdmt": "1SDMT",
-            "sma": "83sma",
-            "star": "1STAR",
-            "stars": "1stars",
-            "svdvd": "1SVDVD",
-            "sw": "h_635SW",
-            "t": "55t",
-            "tkbn": "h_254tkbn",
-            "vspdr": "1VSPDR",
-            "vspds": "1VSPDS",
-            "wnz": "3wnz"
-        },
-        "fanza_suffixes": {
-            "ibw": "z"
-        },
+        "fanza_mappings": {},
+        "fanza_suffixes": {},
         "translation": {
             "api_url": "https://api.siliconflow.cn/v1/chat/completions",
             "source_lang": "日语",
@@ -493,23 +445,64 @@ def video_player(movie_id):
         
         # Try to find video URL or magnet link
         video_url = ""
+        hls_url = ""
         magnet_link = ""
         
-        # Check if we have magnet links first
+        # Try to fetch HLS stream URL from external source - using the similar method as the Windows app
+        if CURRENT_WATCH_URL_PREFIX and video_player_adapter:
+            try:
+                # 修正：使用正确的URL格式：https://missav.ai/MOVIE-ID
+                target_url = f"{CURRENT_WATCH_URL_PREFIX}/{movie_id}"
+                logging.info(f"Fetching video page for {movie_id}: {target_url}")
+                
+                # 创建会话用于请求
+                session = requests.Session()
+                session.headers.update({
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+                    "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+                    "Referer": CURRENT_WATCH_URL_PREFIX,
+                })
+
+                # 使用适配器获取视频流URL
+                logging.info("使用VideoAPIAdapter获取视频流")
+                adapter = video_player_adapter.VideoAPIAdapter(retry=3, delay=2)
+                hls_url = video_player_adapter.get_video_stream_url(target_url, session)
+                
+                if hls_url:
+                    logging.info(f"成功获取HLS URL: {hls_url}")
+                else:
+                    logging.error(f"无法获取视频流URL")
+            except Exception as e:
+                logging.error(f"Error fetching video stream URL: {str(e)}")
+                import traceback
+                logging.error(traceback.format_exc())
+        
+        # If HLS URL was not found, fallback to direct link
+        if not hls_url and CURRENT_WATCH_URL_PREFIX:
+            video_url = f"{CURRENT_WATCH_URL_PREFIX}/{movie_id}"
+            logging.info(f"Using direct video URL for {movie_id}: {video_url}")
+        
+        # Check if we have magnet links as another fallback
         if formatted_movie.get("magnet_links") and len(formatted_movie["magnet_links"]) > 0:
             # Get the best quality magnet link (first one after sorting)
             magnet_link = formatted_movie["magnet_links"][0]["link"]
+            logging.info(f"Using magnet link as fallback for {movie_id}")
         
         return render_template('video_player.html', 
                               movie=formatted_movie,
                               video_url=video_url,
+                              hls_url=hls_url,
                               magnet_link=magnet_link,
                               movie_id=movie_id)
     except Exception as e:
-        logging.error(f"Error in video player route: {str(e)}")
+        error_message = str(e)
+        logging.error(f"Error in video_player route: {error_message}")
+        import traceback
+        logging.error(traceback.format_exc())
         return render_template('error.html', 
-                          error_title="Video Player Error", 
-                          error_message=f"An error occurred loading the video player: {str(e)}"), 500
+                              error_title="Video Player Error", 
+                              error_message=error_message), 500
 
 @app.route('/favorites')
 def favorites():
@@ -1225,6 +1218,119 @@ def get_movie_summary(movie_id):
     except Exception as e:
         logging.error(f"Failed to get summary from FANZA: {str(e)}")
         return jsonify({"status": "error", "message": str(e)}), 500
+
+@app.route('/api/proxy/stream')
+def proxy_stream():
+    """代理HLS视频流内容，解决CORS问题"""
+    stream_url = request.args.get('url')
+    logging.info(f"视频流代理请求: {stream_url}")
+    
+    if not stream_url:
+        return jsonify({"error": "Missing URL parameter"}), 400
+        
+    try:
+        # 解码URL
+        decoded_url = urllib.parse.unquote(stream_url)
+        logging.info(f"代理解码后的URL: {decoded_url}")
+        
+        # 获取URL的基本路径（用于解析相对路径）
+        url_parts = urllib.parse.urlparse(decoded_url)
+        base_url = f"{url_parts.scheme}://{url_parts.netloc}{os.path.dirname(url_parts.path)}/"
+        
+        # 设置请求头
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Accept-Language": "zh-CN,zh;q=0.9,en-US;q=0.8,en;q=0.7",
+            "Origin": request.headers.get("Origin", request.host_url.rstrip("/")),
+            "Referer": request.headers.get("Referer", request.host_url)
+        }
+        
+        # 传递一些重要的请求头
+        for header in ["Range", "If-Modified-Since", "If-None-Match"]:
+            if header in request.headers:
+                headers[header] = request.headers[header]
+        
+        # 发送请求
+        response = requests.get(
+            decoded_url,
+            headers=headers,
+            stream=True,
+            timeout=10,
+            verify=False
+        )
+        
+        # 检查响应状态
+        if response.status_code != 200:
+            logging.error(f"代理请求失败: HTTP {response.status_code}")
+            return jsonify({"error": f"Remote server returned HTTP {response.status_code}"}), response.status_code
+            
+        # 获取内容类型
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
+        
+        # 特殊处理M3U8文件，修改其中的相对URL为代理URL
+        if "application/vnd.apple.mpegurl" in content_type or decoded_url.endswith(".m3u8"):
+            logging.info("检测到M3U8文件，进行处理")
+            content = response.text
+            processed_content = ""
+            
+            # 处理每一行
+            for line in content.splitlines():
+                # 跳过注释和空行
+                if line.strip() == "" or line.startswith("#"):
+                    processed_content += line + "\n"
+                    continue
+                    
+                # 处理URL
+                if line.startswith("http"):
+                    # 绝对URL
+                    absolute_url = line
+                else:
+                    # 相对URL，转换为绝对URL
+                    absolute_url = urllib.parse.urljoin(base_url, line)
+                
+                # 将URL转换为代理URL
+                encoded_url = urllib.parse.quote(absolute_url)
+                proxy_url = f"/api/proxy/stream?url={encoded_url}"
+                processed_content += proxy_url + "\n"
+                logging.info(f"M3U8处理: {line} -> {proxy_url}")
+            
+            # 创建响应
+            proxy_response = Response(
+                processed_content,
+                status=response.status_code
+            )
+            
+            # 设置内容类型
+            proxy_response.headers["Content-Type"] = "application/vnd.apple.mpegurl"
+            
+        else:
+            # 创建响应
+            proxy_response = Response(
+                stream_with_context(response.iter_content(chunk_size=1024)),
+                status=response.status_code
+            )
+            
+            # 设置内容类型
+            proxy_response.headers["Content-Type"] = content_type
+        
+        # 设置CORS头
+        proxy_response.headers["Access-Control-Allow-Origin"] = "*"
+        proxy_response.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        proxy_response.headers["Access-Control-Allow-Headers"] = "Origin, X-Requested-With, Content-Type, Accept, Range"
+        
+        # 复制其他重要的响应头（只对非M3U8内容）
+        if "application/vnd.apple.mpegurl" not in content_type and not decoded_url.endswith(".m3u8"):
+            for header in ["Content-Length", "Content-Range", "Accept-Ranges", "Cache-Control", "Etag"]:
+                if header in response.headers:
+                    proxy_response.headers[header] = response.headers[header]
+                    
+        logging.info(f"代理流成功: {content_type}")
+        return proxy_response
+        
+    except Exception as e:
+        logging.error(f"代理流失败: {str(e)}")
+        return jsonify({"error": str(e)}), 500
 
 # Start the server
 if __name__ == '__main__':

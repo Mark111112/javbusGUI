@@ -169,7 +169,28 @@ class FanzaScraper:
         # 移除非字母数字字符(如连字符)
         cleaned_id = re.sub(r'[^a-z0-9]', '', id_lower)
         
-        # 从ID中提取前缀和数字部分
+        # 特殊处理: 首先检查是否是映射表中的已知前缀
+        for prefix, mapped_prefix in self.prefix_mappings.items():
+            if cleaned_id.startswith(prefix):
+                # 提取数字部分
+                prefix_removed = cleaned_id[len(prefix):]
+                # 找到数字部分
+                num_match = re.search(r'^(\d+)', prefix_removed)
+                if num_match:
+                    num = num_match.group(1).zfill(3)  # 数字部分补零到至少3位
+                    logging.info(f"检测到已知前缀 {prefix}，映射到 {mapped_prefix}")
+                    
+                    # 检查是否有特定尾缀映射
+                    suffix = ""
+                    if prefix in self.suffix_mappings:
+                        suffix = self.suffix_mappings[prefix]
+                        logging.info(f"添加尾缀映射 {suffix}")
+                    
+                    result = f"{mapped_prefix}{num}{suffix}"
+                    logging.info(f"特殊处理映射，最终ID: {result}")
+                    return result
+        
+        # 从ID中提取前缀和数字部分 (标准格式处理)
         match = re.match(r'^([a-z]+)(\d+)$', cleaned_id)
         if match:
             prefix = match.group(1)
@@ -209,23 +230,38 @@ class FanzaScraper:
                 logging.info(f"无映射，使用默认格式，最终ID: {result}")
                 return result
         
-        # A special handling for GESU series - often needs to be mapped to 49gesu
-        #if id_lower.startswith('gesu'):
-        #    logging.info(f"检测到GESU系列，尝试强制映射到49gesu")
-        #    # Extract the number part
-        #    num_match = re.search(r'(\d+)', id_lower)
-        #    if num_match:
-        #        num = num_match.group(1).zfill(3)
-        #        result = f"49gesu{num}"
-        #        logging.info(f"GESU特殊处理，最终ID: {result}")
-        #        return result
-        
         # 如果不符合常规的 字母+数字 格式，返回原始ID（小写）
         logging.info(f"无法匹配常规格式，使用原始ID: {cleaned_id}")
         return cleaned_id
     
     def get_urls_by_id(self, movie_id):
         """返回所有可能的URL"""
+        # 首先检查所有映射中的特殊前缀
+        movie_id_lower = movie_id.lower()
+        for prefix, mapped_prefix in self.prefix_mappings.items():
+            if movie_id_lower.startswith(prefix):
+                # 去掉前缀部分，只保留数字
+                prefix_removed = movie_id_lower[len(prefix):]
+                # 找到数字部分
+                num_match = re.search(r'^(\d+)', prefix_removed)
+                if num_match:
+                    num = num_match.group(1).zfill(3)  # 数字部分补零到至少3位
+                    
+                    # 检查是否有尾缀
+                    suffix = ""
+                    if prefix in self.suffix_mappings:
+                        suffix = self.suffix_mappings[prefix]
+                    
+                    mapped_id = f"{mapped_prefix}{num}{suffix}"
+                    logging.info(f"映射URL处理: {movie_id} -> {mapped_id}")
+                    
+                    urls = [template.format(mapped_id) for template in self.url_templates]
+                    # 添加详细日志
+                    for url in urls:
+                        logging.info(f"映射前缀URL: {url}")
+                    
+                    return urls
+        
         # 检查movie_id是否需要标准化
         if re.match(r'^[a-z]+\d{3,}[a-z]?$', movie_id.lower()):
             # 已经是标准化格式，直接使用
@@ -236,22 +272,6 @@ class FanzaScraper:
             normalized_id = self.normalize_movie_id(movie_id)
             logging.info(f"标准化ID: {movie_id} -> {normalized_id}")
         
-        # 检查是否为GESU系列，特殊处理
-        #if movie_id.upper().startswith('GESU-'):
-            # 强制使用49gesu前缀
-        #    num_match = re.search(r'(\d+)', movie_id)
-        #    if num_match:
-        #        num = num_match.group(1).zfill(3)
-        #        gesu_id = f"49gesu{num}"
-        #        logging.info(f"GESU特殊处理URL映射: {movie_id} -> {gesu_id}")
-        #        urls = [template.format(gesu_id) for template in self.url_templates]
-                
-                # 添加更详细的日志
-        #        for url in urls:
-        #            logging.info(f"GESU特殊URL: {url}")
-                    
-        #        return urls
-            
         urls = [template.format(normalized_id) for template in self.url_templates]
         
         # 如果ID符合特定模式，优先尝试digital videoa URL
