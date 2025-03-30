@@ -1,3 +1,6 @@
+UPDATE(2025/3/30):
+Docker implementation is up. Explore docker folder. Or docker pull furey79/dock-2_javbus. 
+
 UPDATE: 
 Translation for titles and movie introduction, using OpenAI compatible API & Ollama models. 
 
@@ -92,6 +95,11 @@ A: Could be network issues or resource access restrictions - check connection or
 
 **Q: Packaging errors**  
 A: Verify all required Python libraries are installed and follow packaging instructions
+
+
+UPDATE(2025/3/30): 
+
+Dockers版本上线，请参考docker文件夹的内容。docker pull furey79/dock-2_javbus。
 
 灵感来源于 "https://github.com/ovnrain/javbus-api" 的优秀作品。该方案在网络受限环境下尤其便利。
 
