@@ -1,0 +1,16 @@
+version: '3'
+
+services:
+  javbus:
+    build: .
+    container_name: javbus-web
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/app/data
+      - ./buspic:/app/buspic
+      - ./config:/app/config
+    environment:
+      - PYTHONUNBUFFERED=1
+    tty: true 
