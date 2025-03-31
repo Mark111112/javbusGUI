@@ -126,20 +126,24 @@ def load_config():
 
 # Get current configuration
 CURRENT_CONFIG = load_config()
-CURRENT_API_URL = CURRENT_CONFIG.get("api_url", "")
-# Fall back to environment variable only if api_url is not set in config
+
+# 优先使用环境变量中的 API_URL
+CURRENT_API_URL = os.environ.get("API_URL", "")
 if not CURRENT_API_URL:
-    CURRENT_API_URL = os.environ.get("API_URL", "")
-    if CURRENT_API_URL:
-        logging.info(f"Using API URL from environment: {CURRENT_API_URL}")
-        # Update the config file with the API URL from environment
-        CURRENT_CONFIG["api_url"] = CURRENT_API_URL
-        try:
-            with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
-                json.dump(CURRENT_CONFIG, f, ensure_ascii=False, indent=2)
-                logging.info(f"Updated configuration file with API URL from environment")
-        except Exception as e:
-            logging.error(f"Failed to update configuration file: {str(e)}")
+    # 如果环境变量未设置，则使用配置文件中的值
+    CURRENT_API_URL = CURRENT_CONFIG.get("api_url", "")
+    logging.info(f"Using API URL from config file: {CURRENT_API_URL}")
+else:
+    logging.info(f"Using API URL from environment: {CURRENT_API_URL}")
+    # 更新配置文件中的 API URL
+    CURRENT_CONFIG["api_url"] = CURRENT_API_URL
+    try:
+        with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(CURRENT_CONFIG, f, ensure_ascii=False, indent=2)
+            logging.info(f"Updated configuration file with API URL from environment")
+    except Exception as e:
+        logging.error(f"Failed to update configuration file: {str(e)}")
+
 CURRENT_WATCH_URL_PREFIX = CURRENT_CONFIG.get("watch_url_prefix", "https://missav.ai")
 
 # Favorites management
