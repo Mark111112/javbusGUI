@@ -9,7 +9,7 @@ This is the Docker version of the JavBus application, enabling access to JavBus 
 4. Display and copy magnet links
 5. Show movie descriptions (some entries require custom FANZA mapping)
 6. Translate titles and descriptions using online APIs (requires API token)
-7. Online viewing on 2 ways
+7. Jump to missav for online viewing
 
 ## Quick Start
 ### Prerequisites
@@ -35,7 +35,7 @@ docker-compose up -d
 docker build -t dock-2_javbus .
 
 # Run container
-docker run -d -p 9080:8080 -v /docker/dock-2_javbus/buspic /app/buspic -v /docker/dock-2_javbus/config /app/config -v /docker/dock-2_javbus/data /app/data --name dock-2_javbus furey79:dock-2_javbus
+docker run -d -p 9080:8080 -e API_URL = your_api_url -v /docker/dock-2_javbus/buspic /app/buspic -v /docker/dock-2_javbus/config /app/config -v /docker/dock-2_javbus/data /app/data --name dock-2_javbus furey79:dock-2_javbus
 ```
 
 ## Access the Application
@@ -50,6 +50,7 @@ Default SQLite storage is preserved through volume mounts:
 
 ```bash
 docker run -d -p 9080:8080 \
+  -e API_URL = your_api_url \
   -v ./data:/app/data \
   -v ./buspic:/app/buspic \
   -v ./config:/app/config \
@@ -58,6 +59,7 @@ docker run -d -p 9080:8080 \
 
 ## Custom Configuration
 Modify config.json via web interface or directly:
+To designate an API_URL in docker run command will override json configuration! 
 ```json
 {
   "api_url": "your_api_url",
@@ -86,7 +88,7 @@ Modify config.json via web interface or directly:
 4. 显示和复制磁力链接
 5. 获取影片简介（部分影片需要自定义fanza对应）
 6. 对影片标题和简介进行翻译（调用在线API，需要输入API token）
-7. 2种方式在线观影
+7. 跳转到missav的相应页面在线观影
 
 ## 快速开始
 
@@ -121,7 +123,7 @@ docker-compose up -d
 docker build -t dock-2_javbus .
 
 # 运行容器
-docker run -d -p 9080:8080 -v /docker/dock-2_javbus/buspic /app/buspic -v /docker/dock-2_javbus/config /app/config -v /docker/dock-2_javbus/data /app/data --name dock-2_javbus furey79:dock-2_javbus
+docker run -d -p 9080:8080 -e API_URL = your_api_url -v /docker/dock-2_javbus/buspic /app/buspic -v /docker/dock-2_javbus/config /app/config -v /docker/dock-2_javbus/data /app/data --name dock-2_javbus furey79:dock-2_javbus
 ```
 
 ## 访问应用
@@ -136,6 +138,7 @@ docker run -d -p 9080:8080 -v /docker/dock-2_javbus/buspic /app/buspic -v /docke
 
 ```bash
 docker run -d -p 9080:8080 \
+  -e API_URL = your_api_url \
   -v ./data:/app/data \
   -v ./buspic:/app/buspic \
   -v ./config:/app/config \
@@ -145,7 +148,7 @@ docker run -d -p 9080:8080 \
 ## 自定义配置
 
 你可以通过网页配置按钮修改`config.json`文件来自定义应用配置：
-
+环境变量设置的API_URL在部署容器时会覆盖json的值。
 ```json
 {
   "api_url": "你的API地址",
